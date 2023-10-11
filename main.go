@@ -38,11 +38,15 @@ func NewRecipeHandler(c *gin.Context) {
 
 }
 
+func ListRecipesHandler(c *gin.Context) {
+
+	c.JSON(200, recipes)
+}
+
 func main() {
 
 	router := gin.Default()
-
 	router.POST("/recipes", NewRecipeHandler)
-
+	router.GET("/recipes", ListRecipesHandler)
 	router.Run(":5000")
 }
