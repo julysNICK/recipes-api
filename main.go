@@ -1,134 +1,70 @@
 package main
 
 import (
-	"net/http"
-	"strings"
-	"time"
+	"context"
+	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rs/xid"
+	"github.com/go-redis/redis"
+	handlers "github.com/mlabouardy/recipes-api/handlers"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-var recipes []Recipe
+var recipesHandler *handlers.RecipesHandler
 
 func init() {
+	/*recipes = make([]Recipe, 0)
+	file, _ := ioutil.ReadFile("recipes.json")
+	_ = json.Unmarshal([]byte(file), &recipes)
 
-	recipes = make([]Recipe, 0)
-}
-
-type Recipe struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Tags         []string  `json:"tags"`
-	Ingredients  []string  `json:"ingredients"`
-	Instructions []string  `json:"instructions"`
-	PublishedAt  time.Time `json:"publishedAt"`
-}
-
-func NewRecipeHandler(c *gin.Context) {
-	var recipe Recipe
-
-	if err := c.BindJSON(&recipe); err != nil {
-		c.JSON(400, gin.H{"message": "Invalid request"})
+	ctx = context.Background()
+	client, err = mongo.Connect(ctx, options.Client().ApplyURI(os.Getenv("MONGO_URI")))
+	if err = client.Ping(context.TODO(), readpref.Primary()); err != nil {
+		log.Fatal(err)
 	}
-	recipe.ID = xid.New().String()
-	recipe.PublishedAt = time.Now()
+	log.Println("Connected to MongoDB")
 
-	recipes = append(recipes, recipe)
-
-	c.JSON(200, recipe)
-
-}
-
-// swagger:operation GET /recipes recipes listRecipes
-// Returns list of recipes
-// ---
-// produces:
-// - application/json
-// responses:
-// '200':
-// description: Successful operation
-func ListRecipesHandler(c *gin.Context) {
-
-	c.JSON(200, recipes)
-}
-
-func UpdateRecipeHandler(c *gin.Context) {
-	id := c.Param("id")
-
-	var recipe Recipe
-
-	if err := c.BindJSON(&recipe); err != nil {
-		c.JSON(400, gin.H{"message": "Invalid request"})
+	var listOfRecipes []interface{}
+	for _, recipe := range recipes {
+		listOfRecipes = append(listOfRecipes, recipe)
 	}
-
-	index := -1
-
-	for i := 0; i < len(recipes); i++ {
-		if recipes[i].ID == id {
-			index = i
-			break
-		}
+	collection := client.Database(os.Getenv("MONGO_DATABASE")).Collection("recipes")
+	insertManyResult, err := collection.InsertMany(ctx, listOfRecipes)
+	if err != nil {
+		log.Fatal(err)
 	}
-
-	if index == -1 {
-		c.JSON(http.StatusNotFound, gin.H{"message": "Recipe not found"})
+	log.Println("Inserted recipes: ", len(insertManyResult.InsertedIDs))*/
+	ctx := context.Background()
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(os.Getenv("MONGO_URI")))
+	if err = client.Ping(context.TODO(), readpref.Primary()); err != nil {
+		log.Fatal(err)
 	}
+	log.Println("Connected to MongoDB")
+	collection := client.Database(os.Getenv("MONGO_DATABASE")).Collection("recipes")
 
-	recipes[index] = recipe
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+	})
 
-	c.JSON(http.StatusOK, recipe)
-}
+	status := redisClient.Ping()
+	log.Println(status)
 
-func DeleteRecipeHandler(c *gin.Context) {
-	id := c.Param("id")
-
-	index := -1
-
-	for i := 0; i < len(recipes); i++ {
-		if recipes[i].ID == id {
-			index = i
-			break
-		}
-	}
-
-	if index == -1 {
-		c.JSON(http.StatusNotFound, gin.H{"message": "Recipe not found"})
-	}
-
-	recipes = append(recipes[:index], recipes[index+1:]...)
-
-	c.JSON(http.StatusOK, gin.H{"message": "Recipe deleted"})
-}
-
-func SearchRecipesHandler(c *gin.Context) {
-	tag := c.Query("tag")
-
-	result := make([]Recipe, 0)
-
-	for i := 0; i < len(recipes); i++ {
-		found := false
-
-		for _, t := range recipes[i].Tags {
-			if strings.EqualFold(t, tag) {
-				found = true
-			}
-		}
-		if found {
-			result = append(result, recipes[i])
-		}
-	}
-
-	c.JSON(http.StatusOK, result)
+	recipesHandler = handlers.NewRecipesHandler(ctx, collection, redisClient)
 }
 
 func main() {
-
 	router := gin.Default()
-	router.POST("/recipes", NewRecipeHandler)
-	router.GET("/recipes", ListRecipesHandler)
-	router.PUT("recipes/:id", UpdateRecipeHandler)
-	router.DELETE("recipes/:id", DeleteRecipeHandler)
-	router.GET("recipes/search", SearchRecipesHandler)
-	router.Run(":5000")
+	router.POST("/recipes", recipesHandler.NewRecipeHandler)
+	router.GET("/recipes", recipesHandler.ListRecipesHandler)
+	router.PUT("/recipes/:id", recipesHandler.UpdateRecipeHandler)
+	router.DELETE("/recipes/:id", recipesHandler.DeleteRecipeHandler)
+	router.GET("/recipes/:id", recipesHandler.GetOneRecipeHandler)
+	/*
+		router.GET("/recipes/search", SearchRecipesHandler)*/
+	router.Run()
 }
