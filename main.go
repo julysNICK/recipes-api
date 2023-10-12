@@ -40,6 +40,14 @@ func NewRecipeHandler(c *gin.Context) {
 
 }
 
+// swagger:operation GET /recipes recipes listRecipes
+// Returns list of recipes
+// ---
+// produces:
+// - application/json
+// responses:
+// '200':
+// description: Successful operation
 func ListRecipesHandler(c *gin.Context) {
 
 	c.JSON(200, recipes)

@@ -1,0 +1,37 @@
+{
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "schemes": ["http"],
+
+  "swagger": "2.0",
+  "info": {
+    "description": "This is a simple recipes API. You can find out more about the API at https://github.com/julysNICK/recipes-api",
+    "title": "Recipes API",
+    "contact": {
+      "name": "Julys Martins",
+      "email": "julysmartins54@gmail.com"
+    },
+    "version": "1.0.0"
+  },
+  "host": "localhost:5000",
+  "basePath": "/",
+  "paths": {
+    "/recipes": {
+      "get": {
+        "description": "Returns all recipes from the system that the user has access to",
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "A list of pets.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Recipe"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
